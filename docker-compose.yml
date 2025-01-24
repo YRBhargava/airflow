@@ -1,3 +1,4 @@
+version: '3'
 services:
   postgres:
     image: postgres:13
@@ -26,7 +27,8 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-    command: ["airflow", "db", "init"]
+      - ./requirements.txt:/opt/airflow/requirements.txt  # Mount the requirements file
+    command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow db init"]
 
   airflow-webserver:
     image: apache/airflow:2.7.0
@@ -42,7 +44,8 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-    command: ["airflow", "webserver"]
+      - ./requirements.txt:/opt/airflow/requirements.txt  # Mount the requirements file
+    command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow webserver"]
 
   airflow-scheduler:
     image: apache/airflow:2.7.0
@@ -56,7 +59,8 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-    command: ["airflow", "scheduler"]
+      - ./requirements.txt:/opt/airflow/requirements.txt  # Mount the requirements file
+    command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow scheduler"]
 
 volumes:
   postgres-db-volume:
