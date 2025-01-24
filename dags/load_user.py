@@ -1,51 +1,61 @@
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook 
+import boto3
+from airflow.hooks.base_hook import BaseHook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.operators.python import PythonOperator
 from datetime import datetime
 
-# Define the callable function
-def load_s3_to_redshift(schema, table, s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key, redshift_conn_id):
-    # Initialize the S3 Hook with the credentials
-    s3_hook = S3Hook(aws_conn_id=None, client_type="s3")
-    s3_hook.client = s3_hook.get_client_type("s3", aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+# Function to run the COPY command
+def run_copy_command(schema, table, s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws_secret_access_key):
+    # Redshift connection hook
+    redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
 
-    # Check if the file exists in the S3 bucket
-    if s3_hook.check_for_key(s3_key, s3_bucket):
-        print(f"File {s3_key} found in S3 bucket {s3_bucket}. Proceeding with copy to Redshift.")
-        
-        # Initialize the Postgres Hook for Redshift connection
-        redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
-        
-        # Construct COPY command
-        copy_query = f"""
-            COPY {schema}.{table}
-            FROM 's3://{s3_bucket}/{s3_key}'
-            IAM_ROLE '{redshift_hook.get_connection(redshift_conn_id).extra_dejson["iam_role"]}'
-            CSV
-            IGNOREHEADER 1
-            DELIMITER ','
-            REGION 'us-west-2';
-        """
-        
-        # Run the COPY command to load data into Redshift
-        redshift_hook.run(copy_query)
-        print(f"Data copied from S3 {s3_key} to Redshift {schema}.{table}")
-    else:
-        print(f"File {s3_key} not found in S3 bucket {s3_bucket}.")
+    # Construct the S3 path (ensure the file format and path are correct)
+    s3_path = f"s3://{s3_bucket}/{s3_key}"
 
+    # Construct the COPY SQL query
+    copy_sql = f"""
+    COPY {schema}.{table}
+    FROM '{s3_path}'
+    IAM_ROLE 'arn:aws:iam::654654432597:role/s3-access-to-redshift'  
+    FORMAT AS JSON 'auto'
+    IGNOREHEADER 1;  
+    """
 
-# Default Arguments
+    # Run the COPY command
+    redshift_hook.run(copy_sql)
+    move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
+    
+def move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key):
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    )
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    archive_key = f"archive/users-{timestamp}.json"
+
+    s3_client.copy_object(
+        Bucket=s3_bucket,
+        CopySource={"Bucket": s3_bucket, "Key": s3_key},
+        Key=archive_key,
+    )
+
+    s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+    
+
+# Default arguments for the DAG
 default_args = {
-    "owner": "airflow",
-    "retries": 1,
+    'owner': 'airflow',
+    'retries': 1,
 }
 
 # DAG definition
 with DAG(
-    dag_id="copy_s3_to_redshift_callable",
+    dag_id="s3_to_redshift_copy_command",
     default_args=default_args,
-    description="Copy data from S3 to Redshift using a callable function",
+    description="Copy data from S3 to Redshift using S3 COPY command",
     start_date=datetime(2025, 1, 1),
     schedule_interval=None,  # Set your desired schedule
 ) as dag:
@@ -53,14 +63,14 @@ with DAG(
     # Task to call the function
     copy_task = PythonOperator(
         task_id="load_data_to_redshift",
-        python_callable=load_s3_to_redshift,
+        python_callable=run_copy_command,
         op_kwargs={
-            "schema": "dev",  # Your Redshift schema
+            "schema": "public",  # Your Redshift schema
             "table": "user_details",  # Your Redshift table name
             "s3_bucket": "datalakepax8",  # Your S3 bucket name
-            "s3_key": "external/user_data.json",  # Path to the file in S3
-            "aws_access_key_id": "AKIAZQ3DR4VKT32RUHEZ",  # Your AWS Access Key
-            "aws_secret_access_key": "your-secret-access-key",  # Your AWS Secret Key
+            "s3_key": "external/users.json",  # Path to the file in S3
+            "aws_access_key_id": "AKIAZQ3DR4VKSDXA6OEJ",  # Your AWS Access Key
+            "aws_secret_access_key": "rQI9COcUQdvA0mqE5HMoQ337TpmkLGe3CLzuNRd1",  # Your AWS Secret Key
             "redshift_conn_id": "redshift_default",  # Your Airflow Redshift connection ID
         },
     )
