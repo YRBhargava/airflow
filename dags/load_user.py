@@ -66,7 +66,7 @@ with DAG(
         python_callable=run_copy_command,
         op_kwargs={
             "schema": "public",  # Your Redshift schema
-            "table": "user_details",  # Your Redshift table name
+            "table": "users",  # Your Redshift table name
             "s3_bucket": "datalakepax8",  # Your S3 bucket name
             "s3_key": "external/users.json",  # Path to the file in S3
             "aws_access_key_id": "AKIAZQ3DR4VKSDXA6OEJ",  # Your AWS Access Key
@@ -76,3 +76,4 @@ with DAG(
     )
 
     copy_task
+    

@@ -1,4 +1,4 @@
-version: '3'
+
 services:
   postgres:
     image: postgres:13
@@ -12,6 +12,34 @@ services:
   redis:
     image: redis:5
     command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2182
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2182:2182" 
+
+  
+  kafka:
+    image: wurstmeister/kafka:latest
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2182
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9093,OUTSIDE://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+    ports:
+      - "9093:9093"
+      - "9094:9094"
+    depends_on:
+      - zookeeper
+
+
+  
+
 
   airflow-init:
     image: apache/airflow:2.7.0
@@ -27,13 +55,14 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ./requirements.txt:/opt/airflow/requirements.txt  # Mount the requirements file
+      - ./requirements.txt:/opt/airflow/requirements.txt
     command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow db init"]
 
   airflow-webserver:
     image: apache/airflow:2.7.0
     depends_on:
       - airflow-init
+      - kafka
     ports:
       - "8080:8080"
     environment:
@@ -44,13 +73,14 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ./requirements.txt:/opt/airflow/requirements.txt  # Mount the requirements file
+      - ./requirements.txt:/opt/airflow/requirements.txt
     command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow webserver"]
 
   airflow-scheduler:
     image: apache/airflow:2.7.0
     depends_on:
       - airflow-init
+      - kafka
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
@@ -59,8 +89,12 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ./requirements.txt:/opt/airflow/requirements.txt  # Mount the requirements file
+      - ./requirements.txt:/opt/airflow/requirements.txt
     command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow scheduler"]
 
 volumes:
   postgres-db-volume:
+
+networks:
+  airflow-docker_default:
+    external: true
