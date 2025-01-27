@@ -4,6 +4,10 @@ from airflow.hooks.base_hook import BaseHook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.operators.python import PythonOperator
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Function to run the COPY command
 def run_copy_command(schema, table, s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws_secret_access_key):
@@ -12,12 +16,12 @@ def run_copy_command(schema, table, s3_bucket, s3_key, redshift_conn_id, aws_acc
 
     # Construct the S3 path (ensure the file format and path are correct)
     s3_path = f"s3://{s3_bucket}/{s3_key}"
-
+    IAM_ROLE_ARN=os.getenv('REDSHIFT_ROLE_ARN')
     # Construct the COPY SQL query
     copy_sql = f"""
     COPY {schema}.{table}
     FROM '{s3_path}'
-    IAM_ROLE 'arn:aws:iam::654654432597:role/s3-access-to-redshift'  
+    IAM_ROLE '{IAM_ROLE_ARN}'  
     FORMAT AS JSON 'auto'
     IGNOREHEADER 1;  
     """
@@ -67,10 +71,10 @@ with DAG(
         op_kwargs={
             "schema": "public",  # Your Redshift schema
             "table": "users",  # Your Redshift table name
-            "s3_bucket": "datalakepax8",  # Your S3 bucket name
+            "s3_bucket": os.getenv("S3_DATA_LAKE"),  # Your S3 bucket name
             "s3_key": "external/users.json",  # Path to the file in S3
-            "aws_access_key_id": "AKIAZQ3DR4VKSDXA6OEJ",  # Your AWS Access Key
-            "aws_secret_access_key": "rQI9COcUQdvA0mqE5HMoQ337TpmkLGe3CLzuNRd1",  # Your AWS Secret Key
+            "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID"),  # Your AWS Access Key
+            "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY"),  # Your AWS Secret Key
             "redshift_conn_id": "redshift_default",  # Your Airflow Redshift connection ID
         },
     )

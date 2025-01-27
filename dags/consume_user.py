@@ -2,9 +2,12 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
 from confluent_kafka import Consumer, KafkaException
+from dotenv import load_dotenv
 import psycopg2
 import json
+import os
 
+load_dotenv()
 # Function to consume messages from Kafka and insert into Redshift
 def consume_and_insert(**kwargs):
     # Kafka Consumer configuration
@@ -19,11 +22,11 @@ def consume_and_insert(**kwargs):
 
     # Redshift connection details
     conn = psycopg2.connect(
-        dbname="dev",
-        user="admin",
-        password="Beeinatree2002",
-        host="dbt.654654432597.ap-south-1.redshift-serverless.amazonaws.com",
-        port="5439"
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        host=os.getenv('DB_HOST'),
+        port=os.getenv('DB_PORT')
     )
     cursor = conn.cursor()
 
