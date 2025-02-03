@@ -6,7 +6,8 @@ import json
 from datetime import datetime
 
 S3_BUCKET_NAME = 'datalakepax8'
-S3_KEY = 'external/users.json'
+TIMESTAMP = datetime.now().strftime("%Y%m%d%H%M%S")
+S3_KEY = f'external/users/{TIMESTAMP}.json'
 API_URL = 'https://randomuser.me/api/'
 
 def ingest_user_data():

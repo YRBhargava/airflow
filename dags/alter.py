@@ -6,10 +6,8 @@ from datetime import datetime
 import os
 import logging
 
-# SQL scripts directory
-SQL_SCRIPTS_DIR = "/opt/airflow/logs/alter"  # Update this to the directory containing your SQL files
+SQL_SCRIPTS_DIR = "/opt/airflow/logs/alter"  
 
-# Default arguments for the DAG
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
@@ -18,11 +16,11 @@ default_args = {
 
 def execute_pending_scripts(**kwargs):
     
-    postgres_hook = PostgresHook(postgres_conn_id="postgres_default")  
+    postgres_hook = PostgresHook(postgres_conn_id="redshift_default")  
 
     try:
         executed_scripts = Variable.get("executed_sql_scripts", default_var="[]")
-        executed_scripts = eval(executed_scripts)  # Convert string to list
+        executed_scripts = eval(executed_scripts)  
     except Exception as e:
         logging.error(f"Failed to fetch executed scripts: {e}")
         executed_scripts = []

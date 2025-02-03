@@ -9,11 +9,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def run_copy_command(schema, table, s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws_secret_access_key):
+def list_s3_keys(s3_bucket, prefix, aws_access_key_id, aws_secret_access_key):
+    """
+    List all JSON keys in the specified S3 prefix
+    """
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    )
+    
+    paginator = s3_client.get_paginator('list_objects_v2')
+    keys = []
+    
+    for result in paginator.paginate(Bucket=s3_bucket, Prefix=prefix):
+        if 'Contents' in result:
+            keys.extend([
+                obj['Key'] for obj in result['Contents'] 
+                if obj['Key'].endswith('.json')
+            ])
+    
+    return keys
+
+def run_copy_command(s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws_secret_access_key):
+    """
+    Copy a single S3 file to Redshift and archive it
+    """
     redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
 
     s3_path = f"s3://{s3_bucket}/{s3_key}"
-    IAM_ROLE_ARN=os.getenv('REDSHIFT_ROLE_ARN')
+    
+    IAM_ROLE_ARN = os.getenv('REDSHIFT_ROLE_ARN')
+    
+    path_parts = s3_key.split('/')
+    table = 'users'
+    schema = 'public'  
+    
     copy_sql = f"""
     COPY {schema}.{table}
     FROM '{s3_path}'
@@ -23,9 +54,13 @@ def run_copy_command(schema, table, s3_bucket, s3_key, redshift_conn_id, aws_acc
     """
 
     redshift_hook.run(copy_sql)
-    move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
     
+    move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
+
 def move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key):
+    """
+    Move processed file to archive folder
+    """
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=aws_access_key_id,
@@ -33,7 +68,7 @@ def move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
     )
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    archive_key = f"archive/users-{timestamp}.json"
+    archive_key = f'archived/users/{timestamp}'
 
     s3_client.copy_object(
         Bucket=s3_bucket,
@@ -42,7 +77,32 @@ def move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
     )
 
     s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+
+def process_s3_files(**context):
+    """
+    Main task to list and process S3 files
+    """
+    s3_bucket = os.getenv("S3_DATA_LAKE")
+    aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+    redshift_conn_id = "redshift_default"
     
+    s3_keys = list_s3_keys(
+        s3_bucket, 
+        prefix='external/', 
+        aws_access_key_id=aws_access_key_id, 
+        aws_secret_access_key=aws_secret_access_key
+    )
+    
+    for s3_key in s3_keys:
+        run_copy_command(
+            s3_bucket=s3_bucket,
+            s3_key=s3_key,
+            redshift_conn_id=redshift_conn_id,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key
+        )
+
 default_args = {
     'owner': 'airflow',
     'retries': 1,
@@ -51,24 +111,15 @@ default_args = {
 with DAG(
     dag_id="s3_to_redshift_copy_command",
     default_args=default_args,
-    description="Copy data from S3 to Redshift using S3 COPY command",
+    description="Dynamically copy multiple files from S3 to Redshift",
     start_date=datetime(2025, 1, 1),
     schedule_interval=None,  
 ) as dag:
 
-    copy_task = PythonOperator(
-        task_id="load_data_to_redshift",
-        python_callable=run_copy_command,
-        op_kwargs={
-            "schema": "public",  
-            "table": "users",  
-            "s3_bucket": os.getenv("S3_DATA_LAKE"),  
-            "s3_key": "external/users.json",  
-            "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID"),  
-            "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY"),  
-            "redshift_conn_id": "redshift_default",  
-        },
+    process_files_task = PythonOperator(
+        task_id="process_s3_files",
+        python_callable=process_s3_files,
+        provide_context=True,
     )
 
-    copy_task
-    
+    process_files_task
