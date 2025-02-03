@@ -8,9 +8,8 @@ import json
 import os
 
 load_dotenv()
-# Function to consume messages from Kafka and insert into Redshift
+
 def consume_and_insert(**kwargs):
-    # Kafka Consumer configuration
     print('----starting consume_and_insert---')
     consumer = Consumer({
         'bootstrap.servers': 'kafka:9093',
@@ -19,8 +18,6 @@ def consume_and_insert(**kwargs):
     })
 
     consumer.subscribe(['user_topic'])
-
-    # Redshift connection details
     conn = psycopg2.connect(
         dbname=os.getenv('DB_NAME'),
         user=os.getenv('DB_USER'),
@@ -53,7 +50,6 @@ def consume_and_insert(**kwargs):
         cursor.close()
         conn.close()
 
-# Define the Airflow DAG
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,

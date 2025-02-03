@@ -9,15 +9,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Function to run the COPY command
 def run_copy_command(schema, table, s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws_secret_access_key):
-    # Redshift connection hook
     redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
 
-    # Construct the S3 path (ensure the file format and path are correct)
     s3_path = f"s3://{s3_bucket}/{s3_key}"
     IAM_ROLE_ARN=os.getenv('REDSHIFT_ROLE_ARN')
-    # Construct the COPY SQL query
     copy_sql = f"""
     COPY {schema}.{table}
     FROM '{s3_path}'
@@ -26,7 +22,6 @@ def run_copy_command(schema, table, s3_bucket, s3_key, redshift_conn_id, aws_acc
     IGNOREHEADER 1;  
     """
 
-    # Run the COPY command
     redshift_hook.run(copy_sql)
     move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
     
@@ -48,34 +43,30 @@ def move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
 
     s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
     
-
-# Default arguments for the DAG
 default_args = {
     'owner': 'airflow',
     'retries': 1,
 }
 
-# DAG definition
 with DAG(
     dag_id="s3_to_redshift_copy_command",
     default_args=default_args,
     description="Copy data from S3 to Redshift using S3 COPY command",
     start_date=datetime(2025, 1, 1),
-    schedule_interval=None,  # Set your desired schedule
+    schedule_interval=None,  
 ) as dag:
 
-    # Task to call the function
     copy_task = PythonOperator(
         task_id="load_data_to_redshift",
         python_callable=run_copy_command,
         op_kwargs={
-            "schema": "public",  # Your Redshift schema
-            "table": "users",  # Your Redshift table name
-            "s3_bucket": os.getenv("S3_DATA_LAKE"),  # Your S3 bucket name
-            "s3_key": "external/users.json",  # Path to the file in S3
-            "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID"),  # Your AWS Access Key
-            "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY"),  # Your AWS Secret Key
-            "redshift_conn_id": "redshift_default",  # Your Airflow Redshift connection ID
+            "schema": "public",  
+            "table": "users",  
+            "s3_bucket": os.getenv("S3_DATA_LAKE"),  
+            "s3_key": "external/users.json",  
+            "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID"),  
+            "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY"),  
+            "redshift_conn_id": "redshift_default",  
         },
     )
 

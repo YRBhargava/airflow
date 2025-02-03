@@ -38,8 +38,6 @@ def produce_user(**kwargs):
     
     producer.close()
 
-
-# Define the Airflow DAG
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,

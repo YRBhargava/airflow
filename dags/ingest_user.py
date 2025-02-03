@@ -41,7 +41,7 @@ def save_to_s3(random_user_data):
     with open("random_users.json", "w") as file:
         for user in random_user_data:
             file.write(json.dumps(user) + "\n")
-    s3_hook = S3Hook(aws_conn_id='aws_s3_connection')  # Use your AWS connection ID
+    s3_hook = S3Hook(aws_conn_id='aws_s3_connection')  
     s3_hook.load_file(
         filename="random_users.json",
         key=S3_KEY,
