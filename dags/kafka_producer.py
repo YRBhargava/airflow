@@ -31,7 +31,8 @@ def produce_user(**kwargs):
                         f"{random_user_data['location']['city']}, "
                         f"{random_user_data['location']['state']}, "
                         f"{random_user_data['location']['country']} - "
-                        f"{random_user_data['location']['postcode']}"
+                        f"{random_user_data['location']['postcode']}",
+            "modified_at": datetime.now().isoformat()
         }
         producer.send('user_topic', value=user)
         print("Data sent to Kafka topic: user_topic")

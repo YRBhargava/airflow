@@ -13,6 +13,7 @@ def list_s3_keys(s3_bucket, prefix, aws_access_key_id, aws_secret_access_key):
     """
     List all JSON keys in the specified S3 prefix
     """
+    print('Running list_s3_keys')
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=aws_access_key_id,
@@ -28,17 +29,18 @@ def list_s3_keys(s3_bucket, prefix, aws_access_key_id, aws_secret_access_key):
                 obj['Key'] for obj in result['Contents'] 
                 if obj['Key'].endswith('.json')
             ])
-    
+    print('Finished list_s3_keys')
     return keys
 
 def run_copy_command(s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws_secret_access_key):
     """
     Copy a single S3 file to Redshift and archive it
     """
+    print('Running run_copy_command')
     redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
 
     s3_path = f"s3://{s3_bucket}/{s3_key}"
-    
+
     IAM_ROLE_ARN = os.getenv('REDSHIFT_ROLE_ARN')
     
     path_parts = s3_key.split('/')
@@ -49,6 +51,7 @@ def run_copy_command(s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws
     COPY {schema}.{table}
     FROM '{s3_path}'
     IAM_ROLE '{IAM_ROLE_ARN}'  
+    TIMEFORMAT 'YYYY-MM-DDTHH:MI:SS'
     FORMAT AS JSON 'auto'
     IGNOREHEADER 1;  
     """
@@ -56,11 +59,13 @@ def run_copy_command(s3_bucket, s3_key, redshift_conn_id, aws_access_key_id, aws
     redshift_hook.run(copy_sql)
     
     move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
+    print('Finished run_copy_command')
 
 def move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key):
     """
     Move processed file to archive folder
     """
+    print('Running move_files_in_s3')
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=aws_access_key_id,
@@ -77,11 +82,13 @@ def move_file_in_s3(s3_bucket, s3_key, aws_access_key_id, aws_secret_access_key)
     )
 
     s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+    print('Finished move_files_in_s3')
 
 def process_s3_files(**context):
     """
     Main task to list and process S3 files
     """
+    print('Running processs3 files')
     s3_bucket = os.getenv("S3_DATA_LAKE")
     aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
@@ -102,6 +109,7 @@ def process_s3_files(**context):
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key
         )
+    print('Finished process_s3_files')
 
 default_args = {
     'owner': 'airflow',

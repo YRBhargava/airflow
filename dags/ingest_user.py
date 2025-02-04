@@ -31,7 +31,8 @@ def fetch_random_user_data():
                        f"{random_user_data['location']['city']}, "
                        f"{random_user_data['location']['state']}, "
                        f"{random_user_data['location']['country']} - "
-                       f"{random_user_data['location']['postcode']}"
+                       f"{random_user_data['location']['postcode']}",
+            "modified_at": datetime.now().isoformat()
         }
         data.append(user)
     print("------",data)
