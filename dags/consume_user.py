@@ -39,9 +39,9 @@ def consume_and_insert(**kwargs):
                 record = json.loads(msg.value())
                 print('-----Record to be inserted:  ', record)
                 insert_query = """
-                INSERT INTO users (name, age, gender, email, address) VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO users (name, age, gender, email, address, modified_at) VALUES (%s, %s, %s, %s, %s, %s)
                 """
-                cursor.execute(insert_query, (record['name'], record['age'], record['gender'], record['email'], record['address']))
+                cursor.execute(insert_query, (record['name'], record['age'], record['gender'], record['email'], record['address'], record['modified_at']))
                 conn.commit()
     except Exception as error:
         print('exception caught :',error)
