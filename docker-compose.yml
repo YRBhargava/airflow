@@ -38,8 +38,24 @@ services:
     depends_on:
       - zookeeper
 
+  # airflow-init:
+  #   build: .
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   environment:
+  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  #     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+  #     AIRFLOW__CORE__FERNET_KEY: 4o6IAzy4IHJ23hZ8SLUR1gct1fc8quwL71yN8C5tdbA=
+  #     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  #   volumes:
+  #     - ./dags:/opt/airflow/dags
+  #     - ./logs:/opt/airflow/logs
+  #     - ./plugins:/opt/airflow/plugins
+  #     - ./requirements.txt:/opt/airflow/requirements.txt
+  #   command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow db init"]
   airflow-init:
-    image: apache/airflow:2.7.0
+    build: .
     depends_on:
       - postgres
       - redis
@@ -53,12 +69,15 @@ services:
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ./requirements.txt:/opt/airflow/requirements.txt
-    command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow db init"]
+    command: >
+      bash -c "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow db init"
+    restart: "no"
 
   airflow-webserver:
-    image: apache/airflow:2.7.0
+    build: .
     depends_on:
       - airflow-init
+          # condition: 'service_completed_successfully'
       - kafka
     ports:
       - "8080:8080"
@@ -69,14 +88,14 @@ services:
     env_file:
       - .env
     volumes:
-      - ./dags:/opt/airflow/dags
+      - ./dags:/opt/airflow/dags bsjsksjbxghfia
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ./requirements.txt:/opt/airflow/requirements.txt
     command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow webserver"]
 
   airflow-scheduler:
-    image: apache/airflow:2.7.0
+    build: .
     depends_on:
       - airflow-init
       - kafka
@@ -92,6 +111,8 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ./requirements.txt:/opt/airflow/requirements.txt
     command: ["bash", "-c", "pip install --no-cache-dir -r /opt/airflow/requirements.txt && airflow scheduler"]
+
+
 
 volumes:
   postgres-db-volume:
